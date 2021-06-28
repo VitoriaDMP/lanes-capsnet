@@ -1,6 +1,6 @@
 {
-    'cluster': {
-        'worker': ["localhost:20000", "localhost:20001"]
+    "cluster": {
+        "worker": ["localhost:20000", "localhost:20001"]
     },
-    'task': {'type': 'worker', 'index': 0}
+    "task": {"type": "worker", "index": 0}
 }
