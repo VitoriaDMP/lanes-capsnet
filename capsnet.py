@@ -8,6 +8,7 @@ from PIL import Image
 import random
 import scipy
 from capslayer import *
+import json
 
 import os
 import argparse
@@ -216,7 +217,11 @@ if __name__ == "__main__":
 
     (x_train, y_train), (x_test, y_test) = load_mnist() if args.dataset == "mnist" else load_cifar()
 
-    strategy = tf.distribute.MultiWorkerMirroredStrategy()
+    strategy = tf.distribute.MultiWorkerMirroredStrategy(cluster_resolver=None, communication_options=None)
+
+    tf_config = json.loads(os.environ['TF_CONFIG'])
+    num_workers = len(tf_config['cluster']['worker'])
+    args.batch_size = args.batch_size * num_workers
 
     with strategy.scope():
         model, eval_model, manipulate_model = LaneCapsNet(input_shape=x_train.shape[1:],
