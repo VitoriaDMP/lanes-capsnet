@@ -13,7 +13,7 @@ import os
 import argparse
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras import callbacks
-from tensorflow.keras.utils import multi_gpu_model
+#from tensorflow.keras.utils import multi_gpu_model
 
 K.set_image_data_format('channels_last')
 
@@ -59,6 +59,7 @@ def LaneCapsNet(input_shape, n_class, routings, num_lanes = 4, lanesize = 1, lan
     masked_by_y = Mask()([digitcaps1, y])  # The true label is used to mask the output of capsule layer. For training
     masked = Mask()(digitcaps1)  # Mask using the capsule with maximal length. For prediction
 
+    
     # Shared Decoder model in training and prediction
     decoder = models.Sequential(name='decoder')
     decoder.add(layers.Dense(512, activation='relu', input_dim=num_lanes*n_class))
@@ -75,6 +76,7 @@ def LaneCapsNet(input_shape, n_class, routings, num_lanes = 4, lanesize = 1, lan
     noised_digitcaps = layers.Add()([digitcaps1, noise])
     masked_noised_y = Mask()([noised_digitcaps, y])
     manipulate_model = models.Model([x, y, noise], decoder(masked_noised_y))
+
     return train_model, eval_model, manipulate_model
 
 def margin_loss(y_true, y_pred):
@@ -82,7 +84,7 @@ def margin_loss(y_true, y_pred):
             0.5 * (1 - y_true) * tf.square(tf.maximum(0., y_pred - 0.1))
     return tf.reduce_mean(tf.reduce_sum(L, 1))
 
-def train(model, data, args):
+def train(model, data, args, strategy):
     # unpacking the data
     (x_train, y_train), (x_test, y_test) = data
 
@@ -92,14 +94,15 @@ def train(model, data, args):
                                            save_best_only=True, save_weights_only=True, verbose=1)
     lr_decay = callbacks.LearningRateScheduler(schedule=lambda epoch: args.lr * (args.lr_decay ** epoch))
 
-    model.compile(optimizer=optimizers.Adam(lr=args.lr),
-            loss=[margin_loss, 'mse'],
-            loss_weights=[1., args.lam_recon],
-            metrics={'capsnet': 'accuracy'})
+    with strategy.scope():
+        model.compile(optimizer=optimizers.Adam(lr=args.lr),
+                        loss=[margin_loss, 'mse'],
+                        loss_weights=[1., args.lam_recon],
+                        metrics={'capsnet': 'accuracy'})
 
     # Training without data augmentation:
     model.fit((x_train, y_train), (y_train, x_train), batch_size=args.batch_size, epochs=args.epochs,
-              validation_data=((x_test, y_test), (y_test, x_test)), callbacks=[log, checkpoint, lr_decay])
+              validation_data=((x_test, y_test), (y_test, x_test)), callbacks=[log, checkpoint, lr_decay],  workers=2, use_multiprocessing=True)
 
     model.save_weights(args.save_dir + '/trained_model.h5')
     print('Trained model saved to \'%s/trained_model.h5\'' % args.save_dir)
@@ -213,16 +216,19 @@ if __name__ == "__main__":
 
     (x_train, y_train), (x_test, y_test) = load_mnist() if args.dataset == "mnist" else load_cifar()
 
-    model, eval_model, manipulate_model = LaneCapsNet(input_shape=x_train.shape[1:],
-                                                    n_class=len(np.unique(np.argmax(y_train, 1))),
-                                                    routings=args.routings,
-                                                    num_lanes = args.num_lanes,
-                                                    lanesize = args.lane_size,
-                                                    lanedepth = args.lane_depth,
-                                                    lanetype = args.lane_type,
-                                                    gpus = args.gpus)
+    strategy = tf.distribute.MultiWorkerMirroredStrategy()
+
+    with strategy.scope():
+        model, eval_model, manipulate_model = LaneCapsNet(input_shape=x_train.shape[1:],
+                                                        n_class=len(np.unique(np.argmax(y_train, 1))),
+                                                        routings=args.routings,
+                                                        num_lanes = args.num_lanes,
+                                                        lanesize = args.lane_size,
+                                                        lanedepth = args.lane_depth,
+                                                        lanetype = args.lane_type,
+                                                        gpus = args.gpus)
 
     model.summary()
 
 #    gpu_model = multi_gpu_model(model, gpus=args.gpus)
-    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args)
+    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy)
