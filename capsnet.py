@@ -91,8 +91,9 @@ def train(model, data, args, strategy):
 
     # callbacks
     log = callbacks.CSVLogger(args.save_dir + '/log.csv')
-    checkpoint = callbacks.ModelCheckpoint(args.save_dir + 'weights-{epoch:02d}.h5', monitor='val_capsnet_acc',
-                                           save_best_only=True, save_weights_only=True, verbose=1)
+    #checkpoint = callbacks.ModelCheckpoint(args.save_dir + 'weights-{epoch:02d}.h5', monitor='val_capsnet_acc',
+    #                                       save_best_only=True, save_weights_only=True, verbose=1)
+    checkpoint = callbacks.ModelCheckpoint(args.save_dir + 'weights-{epoch:02d}.h5', period=5, verbose=1)
     lr_decay = callbacks.LearningRateScheduler(schedule=lambda epoch: args.lr * (args.lr_decay ** epoch))
 
     with strategy.scope():
@@ -211,6 +212,7 @@ if __name__ == "__main__":
                         help="Type of the lane")
     parser.add_argument('-w', '--weights', default=None, help="The path of the saved weights. Should be specified when testing")
     parser.add_argument('--dataset', default='mnist')
+    parser.add_argument('--load_dir', default=None)
     args = parser.parse_args()
 
     regularizers.l1_l2(l1=0.008, l2=0.008)
@@ -224,14 +226,18 @@ if __name__ == "__main__":
     args.batch_size = args.batch_size * num_workers
 
     with strategy.scope():
-        model, eval_model, manipulate_model = LaneCapsNet(input_shape=x_train.shape[1:],
-                                                        n_class=len(np.unique(np.argmax(y_train, 1))),
-                                                        routings=args.routings,
-                                                        num_lanes = args.num_lanes,
-                                                        lanesize = args.lane_size,
-                                                        lanedepth = args.lane_depth,
-                                                        lanetype = args.lane_type,
-                                                        gpus = args.gpus)
+        if args.load_dir is None:
+            model, eval_model, manipulate_model = LaneCapsNet(input_shape=x_train.shape[1:],
+                                                            n_class=len(np.unique(np.argmax(y_train, 1))),
+                                                            routings=args.routings,
+                                                            num_lanes = args.num_lanes,
+                                                            lanesize = args.lane_size,
+                                                            lanedepth = args.lane_depth,
+                                                            lanetype = args.lane_type,
+                                                            gpus = args.gpus)
+        else:
+            model = models.laod_model(args.load_dir)
+
 
     model.summary()
 
