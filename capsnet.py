@@ -24,6 +24,7 @@ iteration_begin = 0
 epoch_begin = 0
 node = 0
 epoch_cur = 0
+time_iterations = []
 
 class CustomCallback(callbacks.Callback):
         
@@ -49,6 +50,14 @@ class CustomCallback(callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         iteration_end = time.time() - iteration_begin
         elapsed_time = time.time() - initial_time
+        # Calculate average and standard deviation each 10 iterations
+        if (batch + 1) % 10 == 0:
+            average = sum(time_iterations)/len(time_iterations)
+            stad_deviation = sum([((x - average) ** 2) for x in time_iterations]) / len(time_iterations)
+            stad_deviation = stad_deviation ** 0.5
+            print('\nStad_deviation: ',str(stad_deviation))
+        else:
+            time_iterations.append(iteration_end)    
         print(f"\n[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end:.4f},Elapsed time,{elapsed_time:.4f}")
 
 K.set_image_data_format('channels_last')
