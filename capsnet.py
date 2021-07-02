@@ -5,17 +5,46 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.utils import custom_object_scope
 from tensorflow.keras import regularizers
+from tensorflow.keras import callbacks
 from PIL import Image
 import random
 import scipy
 from capslayer import *
 import json
+import time
 
 import os
 import argparse
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras import callbacks
 #from tensorflow.keras.utils import multi_gpu_model
+
+initial_time = 0
+iteration_begin = 0
+epoch_begin
+node = 0
+epoch_cur = 0
+
+class CustomCallback(callbacks.Callback):
+        
+    def on_train_begin(self, logs=None):
+        initialization_time = time.time() - initial_time
+        print(f"[MO833] Rank,{node},Initialization Time: {initialization_time}")
+
+    def on_epoch_begin(self, epoch, logs=None):
+        epoch_cur = epoch
+        
+    def on_epoch_end(self, epoch, logs=None):
+        keys = list(logs.keys())
+        print("End epoch {} of training; got log keys: {}".format(epoch, keys))
+
+    def on_train_batch_begin(self, batch, logs=None):
+        iteration_begin = time.time() 
+
+    def on_train_batch_end(self, batch, logs=None):
+        iteration_end = time.time() - iteration_begin
+        elapsed_time = time.time() - initial_time
+        print(f"[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end},Elapsed time,{elapsed_time}")
 
 K.set_image_data_format('channels_last')
 
@@ -93,7 +122,7 @@ def margin_loss(y_true, y_pred):
             0.5 * (1 - y_true) * tf.square(tf.maximum(0., y_pred - 0.1))
     return tf.reduce_mean(tf.reduce_sum(L, 1))
 
-def train(model, data, args, strategy, node=0):
+def train(model, data, args, strategy):
     # unpacking the data
     (x_train, y_train), (x_test, y_test) = data
 
@@ -113,7 +142,7 @@ def train(model, data, args, strategy, node=0):
 
     # Training without data augmentation:
     model.fit((x_train, y_train), (y_train, x_train), batch_size=args.batch_size, epochs=args.epochs,
-              validation_data=((x_test, y_test), (y_test, x_test)), callbacks=[log, checkpoint, lr_decay],  workers=2, use_multiprocessing=True)
+              validation_data=((x_test, y_test), (y_test, x_test)), callbacks=[log, checkpoint, lr_decay, CustomCallback()],  workers=2, use_multiprocessing=True)
 
     model.save_weights(args.save_dir + '/trained_model.h5')
     print('Trained model saved to \'%s/trained_model.h5\'' % args.save_dir)
@@ -185,6 +214,8 @@ def load_mnist():
 
 if __name__ == "__main__":
 
+    # Tempo inicial
+    initial_time = time.time()
 
     parser = argparse.ArgumentParser(description="Multi-lane Capsule Network")
 
@@ -226,6 +257,9 @@ if __name__ == "__main__":
     parser.add_argument('--load_dir', default=None)
     args = parser.parse_args()
 
+    # Get node:
+    node=args.node
+
     regularizers.l1_l2(l1=0.008, l2=0.008)
 
     (x_train, y_train), (x_test, y_test) = load_mnist() if args.dataset == "mnist" else load_cifar()
@@ -254,4 +288,4 @@ if __name__ == "__main__":
     model.summary()
 
 #    gpu_model = multi_gpu_model(model, gpus=args.gpus)
-    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy, node=args.node)
+    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy)
