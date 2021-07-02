@@ -17,14 +17,20 @@ import os
 import argparse
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras import callbacks
+import json
 #from tensorflow.keras.utils import multi_gpu_model
 
 initial_time = 0
 iteration_begin = 0
 epoch_begin = 0
+total_epochs = 0
+total_iterations = 0
 node = 0
 epoch_cur = 0
 time_iterations = []
+stad_deviation_digit = 0
+stad_deviation_count = 0
+training = True
 
 class CustomCallback(callbacks.Callback):
         
@@ -48,6 +54,8 @@ class CustomCallback(callbacks.Callback):
         iteration_begin = time.time() 
 
     def on_train_batch_end(self, batch, logs=None):
+        global stad_deviation_digit
+        global stad_deviation_count
         iteration_end = time.time() - iteration_begin
         elapsed_time = time.time() - initial_time
         # Calculate average and standard deviation each 10 iterations
@@ -55,8 +63,56 @@ class CustomCallback(callbacks.Callback):
             average = sum(time_iterations)/len(time_iterations)
             stad_deviation = sum([((x - average) ** 2) for x in time_iterations]) / len(time_iterations)
             stad_deviation = stad_deviation ** 0.5
-            print('\nStad_deviation: ',str(stad_deviation), ' average:', average)
-            #if (stad_deviation <= 5):
+            #print('\nStad_deviation: ',str(stad_deviation), ' average:', average)
+            # Find first not zero digit
+            digit = stad_deviation
+            if digit != 0:
+                while((int(digit*10))%10 == 0):
+                    digit = digit*10
+                digit = int(digit*10)
+                if (digit == stad_deviation_digit):
+                    if stad_deviation_count < 5:
+                        stad_deviation_count += 1
+                    else:
+                        # Finish node
+                        if (node == 0):
+                            # Write metrics
+                            metrics = {}
+                            metrics['node'] = []
+                            metrics['node'].append({
+                                'id' : node,
+                                'last_iteration': batch + 1,
+                                'last_epoch': epoch_cur,
+                                'num_epoch': total_epochs,
+                                'num_iterations': total_iterations,
+                                'average': average,
+                                'standard_deviation': stad_deviation
+                            })
+                            with open('result/metrics-'+str(node), 'w') as outfile:
+                                json.dump(metrics, outfile)
+                            # Finish training
+                            exit()
+                        elif training:
+                            # Write metrics in JSON file
+                            metrics = {}
+                            metrics['node'] = []
+                            metrics['node'].append({
+                                'id' : node,
+                                'last_iteration': batch + 1,
+                                'last_epoch': epoch_cur,
+                                'num_epoch': total_epochs,
+                                'num_iterations': total_iterations,
+                                'average': average,
+                                'standard_deviation': stad_deviation
+                            })
+                            with open('result/metrics-'+str(node), 'w') as outfile:
+                                json.dump(metrics, outfile)
+                            # Send own metrics
+                            #SCP
+                            # Finish training
+                            training = False
+                else:
+                    stad_deviation_digit = digit
         elif batch != 0:
             time_iterations.append(iteration_end)    
         print(f"\n[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end:.4f},Elapsed time,{elapsed_time:.4f}")
@@ -156,6 +212,7 @@ def train(model, data, args, strategy, initial_epoch):
                         metrics={'capsnet': 'accuracy'})
 
     # Training without data augmentation:
+    total_epochs = epochs=args.epochs
     model.fit((x_train, y_train), (y_train, x_train), batch_size=args.batch_size, epochs=args.epochs, initial_epoch=initial_epoch,
               validation_data=((x_test, y_test), (y_test, x_test)), callbacks=[log, checkpoint, lr_decay, CustomCallback()],  workers=2, use_multiprocessing=True)
 
@@ -284,6 +341,7 @@ if __name__ == "__main__":
     tf_config = json.loads(os.environ['TF_CONFIG'])
     num_workers = len(tf_config['cluster']['worker'])
     args.batch_size = args.batch_size * num_workers
+    total_iterations =  (x_train * y_train)/args.batch_size
 
     initial_epoch = 0
 
