@@ -40,7 +40,7 @@ class CustomCallback(callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         epoch_end = time.time() - epoch_begin
         elapsed_time = time.time() - initial_time
-        print(f"\n[MO833] Rank,{node},Epoch,{epoch},Epoch time,{epoch_end},Elapsed time,{elapsed_time}")
+        print(f"\n[MO833] Rank,{node},Epoch,{epoch},Epoch time,{epoch_end:.4f},Elapsed time,{elapsed_time:.4f}")
 
     def on_train_batch_begin(self, batch, logs=None):
         global iteration_begin
@@ -49,7 +49,7 @@ class CustomCallback(callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         iteration_end = time.time() - iteration_begin
         elapsed_time = time.time() - initial_time
-        print(f"\n[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end},Elapsed time,{elapsed_time}")
+        print(f"\n[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end:.4f},Elapsed time,{elapsed_time:.4f}")
 
 K.set_image_data_format('channels_last')
 
@@ -127,7 +127,7 @@ def margin_loss(y_true, y_pred):
             0.5 * (1 - y_true) * tf.square(tf.maximum(0., y_pred - 0.1))
     return tf.reduce_mean(tf.reduce_sum(L, 1))
 
-def train(model, data, args, strategy):
+def train(model, data, args, strategy, initial_epoch):
     # unpacking the data
     (x_train, y_train), (x_test, y_test) = data
 
@@ -146,7 +146,7 @@ def train(model, data, args, strategy):
                         metrics={'capsnet': 'accuracy'})
 
     # Training without data augmentation:
-    model.fit((x_train, y_train), (y_train, x_train), batch_size=args.batch_size, epochs=args.epochs,
+    model.fit((x_train, y_train), (y_train, x_train), batch_size=args.batch_size, epochs=args.epochs, initial_epoch=initial_epoch,
               validation_data=((x_test, y_test), (y_test, x_test)), callbacks=[log, checkpoint, lr_decay, CustomCallback()],  workers=2, use_multiprocessing=True)
 
     model.save_weights(args.save_dir + '/trained_model.h5')
@@ -275,6 +275,8 @@ if __name__ == "__main__":
     num_workers = len(tf_config['cluster']['worker'])
     args.batch_size = args.batch_size * num_workers
 
+    initial_epoch = 0
+
     with strategy.scope():
         if args.load_dir is None:
             model, eval_model, manipulate_model = LaneCapsNet(input_shape=x_train.shape[1:],
@@ -289,8 +291,9 @@ if __name__ == "__main__":
             custom_objects = {"CapsuleLayer": CapsuleLayer, "Mask": Mask, "Length": Length, "margin_loss": margin_loss}
             with custom_object_scope(custom_objects):
                 model = models.load_model(args.load_dir)
+                initial_epoch = int(args.load_dir.split('-')[2]) - 1
 
     model.summary()
 
 #    gpu_model = multi_gpu_model(model, gpus=args.gpus)
-    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy)
+    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy, initial_epoch = initial_epoch)
