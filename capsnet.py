@@ -55,7 +55,7 @@ class CustomCallback(callbacks.Callback):
             average = sum(time_iterations)/len(time_iterations)
             stad_deviation = sum([((x - average) ** 2) for x in time_iterations]) / len(time_iterations)
             stad_deviation = stad_deviation ** 0.5
-            print('\nStad_deviation: ',str(stad_deviation))
+            print('\nStad_deviation: ',str(stad_deviation), ' average:', average)
             #if (stad_deviation <= 5):
         elif batch != 0:
             time_iterations.append(iteration_end)    
