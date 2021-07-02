@@ -21,7 +21,7 @@ from tensorflow.keras import callbacks
 
 initial_time = 0
 iteration_begin = 0
-epoch_begin
+epoch_begin = 0
 node = 0
 epoch_cur = 0
 
@@ -33,10 +33,12 @@ class CustomCallback(callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs=None):
         epoch_cur = epoch
+        epoch_begin = time.time()
         
     def on_epoch_end(self, epoch, logs=None):
-        keys = list(logs.keys())
-        print("End epoch {} of training; got log keys: {}".format(epoch, keys))
+        epoch_end = time.time() - epoch_begin
+        elapsed_time = time.time() - initial_time
+        print(f"[MO833] Rank,{node},Epoch,{epoch},Epoch time,{epoch_end},Elapsed time,{elapsed_time}")
 
     def on_train_batch_begin(self, batch, logs=None):
         iteration_begin = time.time() 
