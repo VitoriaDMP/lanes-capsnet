@@ -56,7 +56,8 @@ class CustomCallback(callbacks.Callback):
             stad_deviation = sum([((x - average) ** 2) for x in time_iterations]) / len(time_iterations)
             stad_deviation = stad_deviation ** 0.5
             print('\nStad_deviation: ',str(stad_deviation))
-        else:
+            #if (stad_deviation <= 5):
+        elif batch != 0:
             time_iterations.append(iteration_end)    
         print(f"\n[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end:.4f},Elapsed time,{elapsed_time:.4f}")
 
