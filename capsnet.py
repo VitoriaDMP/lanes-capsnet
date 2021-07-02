@@ -88,7 +88,7 @@ class CustomCallback(callbacks.Callback):
                                 'average': average,
                                 'standard_deviation': stad_deviation
                             })
-                            with open('result/metrics-'+str(node), 'w') as outfile:
+                            with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
                                 json.dump(metrics, outfile)
                             # Finish training
                             exit()
@@ -105,7 +105,7 @@ class CustomCallback(callbacks.Callback):
                                 'average': average,
                                 'standard_deviation': stad_deviation
                             })
-                            with open('result/metrics-'+str(node), 'w') as outfile:
+                            with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
                                 json.dump(metrics, outfile)
                             # Send own metrics
                             #SCP
@@ -341,7 +341,14 @@ if __name__ == "__main__":
     tf_config = json.loads(os.environ['TF_CONFIG'])
     num_workers = len(tf_config['cluster']['worker'])
     args.batch_size = args.batch_size * num_workers
-    total_iterations =  (x_train * y_train)/args.batch_size
+    total_iterations = 1
+    for i in x_train:
+        if i != 0:
+            total_iterations = total_iterations*i
+    for j in y_train:
+        if j != 0:
+            total_iterations = total_iterations*j 
+    total_iterations =  total_iterations/args.batch_size
 
     initial_epoch = 0
 
