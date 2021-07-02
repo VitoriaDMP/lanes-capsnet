@@ -56,6 +56,7 @@ class CustomCallback(callbacks.Callback):
         global stad_deviation_digit
         global stad_deviation_count
         global digit_pos
+        global training
         iteration_end = time.time() - iteration_begin
         elapsed_time = time.time() - initial_time
         # Calculate average and standard deviation each 10 iterations
@@ -66,6 +67,9 @@ class CustomCallback(callbacks.Callback):
             print('\nStandard_deviation:',str(stad_deviation), ', Average:', average)
             # Find first not zero digit
             digit = stad_deviation
+            if not training and node == 0:
+                # Verify if all nodes finish training
+                exit()
             if digit != 0:
                 digit_pos_nw = 0
                 while((int(digit*10))%10 == 0):
@@ -87,8 +91,9 @@ class CustomCallback(callbacks.Callback):
                             'standard_deviation': stad_deviation
                         })
                         with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
-                            json.dump(metrics, outfile)                            # Finish training
-                        exit()
+                            json.dump(metrics, outfile)                            
+                        # Finish training
+                        training = False
                     elif training:
                         # Write metrics in JSON file
                         metrics = {}
