@@ -3,6 +3,7 @@ from tensorflow.keras import layers, models, optimizers
 from tensorflow.keras.layers import concatenate, Permute, Lambda
 from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.utils import custom_object_scope
 from tensorflow.keras import regularizers
 from PIL import Image
 import random
@@ -70,6 +71,13 @@ def LaneCapsNet(input_shape, n_class, routings, num_lanes = 4, lanesize = 1, lan
 
     # Models for training and evaluation (prediction)
     train_model = models.Model([x, y], [out_caps, decoder(masked_by_y)])
+    # Retrieve the config
+    config = train_model.get_config()
+
+    # At loading time, register the custom objects with a `custom_object_scope`:
+    custom_objects = {"CapsuleLayer": CapsuleLayer, "Mask": Mask, "Length": Length}
+    with custom_object_scope(custom_objects):
+        train_model = models.Model.from_config(config)
     eval_model = models.Model(x, [out_caps, decoder(masked)])
 
     # manipulate model
@@ -85,7 +93,7 @@ def margin_loss(y_true, y_pred):
             0.5 * (1 - y_true) * tf.square(tf.maximum(0., y_pred - 0.1))
     return tf.reduce_mean(tf.reduce_sum(L, 1))
 
-def train(model, data, args, strategy):
+def train(model, data, args, strategy, node=0):
     # unpacking the data
     (x_train, y_train), (x_test, y_test) = data
 
@@ -93,11 +101,12 @@ def train(model, data, args, strategy):
     log = callbacks.CSVLogger(args.save_dir + '/log.csv')
     #checkpoint = callbacks.ModelCheckpoint(args.save_dir + 'weights-{epoch:02d}.h5', monitor='val_capsnet_acc',
     #                                       save_best_only=True, save_weights_only=True, verbose=1)
-    checkpoint = callbacks.ModelCheckpoint(args.save_dir + 'weights-{epoch:02d}.h5', period=5, verbose=1)
+    checkpoint = callbacks.ModelCheckpoint(args.save_dir + '/model-epoch-{epoch:02d}-node-'+ str(node) +'.h5', save_best_only=False, save_weights_only=False, mode='auto', save_freq=1, period=1, verbose=0)
     lr_decay = callbacks.LearningRateScheduler(schedule=lambda epoch: args.lr * (args.lr_decay ** epoch))
 
     with strategy.scope():
-        model.compile(optimizer=optimizers.Adam(lr=args.lr),
+        if args.load_dir is None:
+            model.compile(optimizer=optimizers.Adam(lr=args.lr),
                         loss=[margin_loss, 'mse'],
                         loss_weights=[1., args.lam_recon],
                         metrics={'capsnet': 'accuracy'})
@@ -208,6 +217,8 @@ if __name__ == "__main__":
                         help="Lane depth")
     parser.add_argument('--gpus', default=0, type=int,
                         help="number of gpus to be used")
+    parser.add_argument('--node', default=0, type=int,
+                        help="number of node")
     parser.add_argument('--lane_type', default=1, type=int,
                         help="Type of the lane")
     parser.add_argument('-w', '--weights', default=None, help="The path of the saved weights. Should be specified when testing")
@@ -236,10 +247,11 @@ if __name__ == "__main__":
                                                             lanetype = args.lane_type,
                                                             gpus = args.gpus)
         else:
-            model = models.laod_model(args.load_dir)
-
+            custom_objects = {"CapsuleLayer": CapsuleLayer, "Mask": Mask, "Length": Length, "margin_loss": margin_loss}
+            with custom_object_scope(custom_objects):
+                model = models.load_model(args.load_dir)
 
     model.summary()
 
 #    gpu_model = multi_gpu_model(model, gpus=args.gpus)
-    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy)
+    train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args, strategy = strategy, node=args.node)
