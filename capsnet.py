@@ -32,21 +32,24 @@ class CustomCallback(callbacks.Callback):
         print(f"[MO833] Rank,{node},Initialization Time: {initialization_time}")
 
     def on_epoch_begin(self, epoch, logs=None):
+        global epoch_cur
+        global epoch_begin
         epoch_cur = epoch
         epoch_begin = time.time()
         
     def on_epoch_end(self, epoch, logs=None):
         epoch_end = time.time() - epoch_begin
         elapsed_time = time.time() - initial_time
-        print(f"[MO833] Rank,{node},Epoch,{epoch},Epoch time,{epoch_end},Elapsed time,{elapsed_time}")
+        print(f"\n[MO833] Rank,{node},Epoch,{epoch},Epoch time,{epoch_end},Elapsed time,{elapsed_time}")
 
     def on_train_batch_begin(self, batch, logs=None):
+        global iteration_begin
         iteration_begin = time.time() 
 
     def on_train_batch_end(self, batch, logs=None):
         iteration_end = time.time() - iteration_begin
         elapsed_time = time.time() - initial_time
-        print(f"[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end},Elapsed time,{elapsed_time}")
+        print(f"\n[MO833] Rank,{node},Epoch,{epoch_cur},Iteration,{batch},It. time,{iteration_end},Elapsed time,{elapsed_time}")
 
 K.set_image_data_format('channels_last')
 
