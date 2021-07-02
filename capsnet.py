@@ -69,7 +69,16 @@ class CustomCallback(callbacks.Callback):
             digit = stad_deviation
             if not training and node == 0:
                 # Verify if all nodes finish training
-                exit()
+                tf_config = json.loads(os.environ['TF_CONFIG'])
+                result_files = os.listdir('result/')
+                total_nodes = len(tf_config['cluster']['worker'])
+                stop_traning = True
+                for i in range(0, total_nodes):
+                    if ('metrics-'+ str(i)+'.json') not in result_files:
+                        stop_traning = False
+                        break
+                if stop_traning:
+                    exit()
             if digit != 0:
                 digit_pos_nw = 0
                 while((int(digit*10))%10 == 0):
