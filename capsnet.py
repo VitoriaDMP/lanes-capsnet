@@ -78,6 +78,8 @@ class CustomCallback(callbacks.Callback):
                         stop_traning = False
                         break
                 if stop_traning:
+                    for i in range(1, total_nodes):
+                        os.system('scp ubuntu@'+ (tf_config['cluster']['worker'])[i].split(':')[0] + ':~/lanes-capsnet/result/* ~/lanes-capsnet/result/')
                     exit()
             if digit != 0:
                 digit_pos_nw = 0
@@ -117,8 +119,9 @@ class CustomCallback(callbacks.Callback):
                         })
                         with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
                             json.dump(metrics, outfile)
-                        # Send own metrics
-                        #SCP
+                        # Send metrics to node 0
+                        tf_config = json.loads(os.environ['TF_CONFIG'])
+                        os.system('scp result/metrics-'+str(node)+'.json ubuntu@'+ (tf_config['cluster']['worker'])[0].split(':')[0] + ':~/lanes-capsnet/result/')
                         # Finish training
                         training = False
                 else:
