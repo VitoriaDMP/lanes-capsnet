@@ -343,8 +343,9 @@ if __name__ == "__main__":
     parser.add_argument('--load_dir', default=None)
     args = parser.parse_args()
 
-    # Get node:
-    node=args.node
+    # Set TF_CONFIG
+    with open('tf_config.json', 'r') as reader:
+        os.environ["TF_CONFIG"] = reader.read()
 
     regularizers.l1_l2(l1=0.008, l2=0.008)
 
@@ -354,6 +355,8 @@ if __name__ == "__main__":
 
     tf_config = json.loads(os.environ['TF_CONFIG'])
     num_workers = len(tf_config['cluster']['worker'])
+    # Get node:
+    node=tf_config['task']['index']
     args.batch_size = args.batch_size * num_workers
 
     initial_epoch = 0
