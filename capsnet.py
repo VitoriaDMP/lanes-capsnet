@@ -30,6 +30,7 @@ time_iterations = []
 stad_deviation_digit = 0
 digit_pos = 0
 training = True
+metrics = {}
 
 class CustomCallback(callbacks.Callback):
         
@@ -57,6 +58,7 @@ class CustomCallback(callbacks.Callback):
         global stad_deviation_count
         global digit_pos
         global training
+        global metrics
         iteration_end = time.time() - iteration_begin
         elapsed_time = time.time() - initial_time
         # Calculate average and standard deviation each 10 iterations
@@ -80,6 +82,8 @@ class CustomCallback(callbacks.Callback):
                 if stop_traning:
                     for i in range(1, total_nodes):
                         os.system('scp ubuntu@'+ (tf_config['cluster']['worker'])[i].split(':')[0] + ':~/lanes-capsnet/result/* ~/lanes-capsnet/result/')
+                    with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
+                        json.dump(metrics, outfile)   
                     exit()
             if digit != 0:
                 digit_pos_nw = 0
@@ -89,39 +93,28 @@ class CustomCallback(callbacks.Callback):
                 digit = int(digit*10)
                 if (digit == stad_deviation_digit and digit_pos_nw == digit_pos):
                     # Finish node
-                    if (node == 0):
-                        #Write metrics
-                        metrics = {}
-                        metrics['node'] = []
-                        metrics['node'].append({
-                            'id' : node,
-                            'last_iteration': batch + 1,
-                            'last_epoch': epoch_cur,
-                            'num_epoch': total_epochs,
-                            'average': average,
-                            'standard_deviation': stad_deviation
-                        })
-                        with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
-                            json.dump(metrics, outfile)                            
+                    #Write metrics
+                    metrics['node'] = []
+                    metrics['node'].append({
+                        'id' : node,
+                        'last_iteration': batch + 1,
+                        'last_epoch': epoch_cur,
+                        'num_epoch': total_epochs,
+                        'average': average,
+                        'standard_deviation': stad_deviation
+                    }) 
+                    if (node == 0):                         
                         # Finish training
                         training = False
                     elif training:
                         # Write metrics in JSON file
-                        metrics = {}
-                        metrics['node'] = []
-                        metrics['node'].append({
-                            'id' : node,
-                            'last_iteration': batch + 1,
-                            'last_epoch': epoch_cur,
-                            'num_epoch': total_epochs,
-                            'average': average,
-                            'standard_deviation': stad_deviation
-                        })
                         with open('result/metrics-'+str(node)+'.json', 'w') as outfile:
                             json.dump(metrics, outfile)
                         # Send metrics to node 0
                         tf_config = json.loads(os.environ['TF_CONFIG'])
-                        os.system('scp result/metrics-'+str(node)+'.json ubuntu@'+ (tf_config['cluster']['worker'])[0].split(':')[0] + ':~/lanes-capsnet/result/')
+                        res = 1
+                        while res != 0:
+                            res = os.system('scp result/metrics-'+str(node)+'.json ubuntu@'+ (tf_config['cluster']['worker'])[0].split(':')[0] + ':~/lanes-capsnet/result/')
                         # Finish training
                         training = False
                 else:
