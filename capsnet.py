@@ -77,6 +77,7 @@ class CustomCallback(callbacks.Callback):
                 stop_traning = True
                 for i in range(0, total_nodes):
                     if ('metrics-'+ str(i)+'.json') not in result_files:
+                        print("STOP TRAINING = FALSE")
                         stop_traning = False
                         break
                 if stop_traning:
