@@ -75,9 +75,8 @@ class CustomCallback(callbacks.Callback):
                 result_files = os.listdir('result/')
                 total_nodes = len(tf_config['cluster']['worker'])
                 stop_traning = True
-                for i in range(0, total_nodes):
+                for i in range(1, total_nodes):
                     if ('metrics-'+ str(i)+'.json') not in result_files:
-                        print("STOP TRAINING = FALSE")
                         stop_traning = False
                         break
                 if stop_traning:
